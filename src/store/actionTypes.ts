@@ -1,0 +1,3 @@
+export const CHANGE_FIRST_MOVE = 'CHANGE_FIRST_MOVE';
+export const CHANGE_PARAM_N = 'CHANGE_PARAM_N';
+export const CHANGE_PARAM_M = 'CHANGE_PARAM_M';
