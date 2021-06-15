@@ -4,19 +4,18 @@ import { View, Text } from 'react-native';
 import { styles } from './matches.styles';
 
 type TProps = {
-  quantity: string[];
+  quantity: number;
 };
 
 const Matches: React.FC<TProps> = ({ quantity }) => {
-  if (quantity.length > 30) {
-    quantity.splice(30);
-  }
+  const length = quantity >= 30 ? 30 : quantity;
+  const array = new Array(length).fill('1');
 
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>{quantity.length}</Text>
+      <Text style={styles.text}>{quantity}</Text>
       <View style={styles.matchesContainer}>
-        {quantity.map((_, i) => (
+        {array.map((_, i) => (
           <Text style={styles.text} key={i}>
             ✏️
           </Text>

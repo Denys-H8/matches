@@ -5,7 +5,7 @@ import {
 } from './actionTypes';
 
 export type TState = {
-  firstMove: string;
+  firstMove: 'USER' | 'AI';
   paramN: number;
   paramM: number;
 };

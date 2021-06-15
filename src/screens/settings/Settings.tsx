@@ -12,7 +12,7 @@ import { styles } from './settings.styles';
 const Settings: React.FC = () => {
   const { state, dispatch } = useContext(SettingsContext);
 
-  const onChangeParam = (value: string, type: string): void | null => {
+  const onChangeParam = (value: string, type: 'N' | 'M'): void | null => {
     if (+value || value === '') {
       if (type === 'N') {
         if (+value === 0) {

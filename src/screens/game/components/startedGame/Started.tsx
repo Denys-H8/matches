@@ -1,4 +1,10 @@
-import React, { useContext, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { View } from 'react-native';
 
 import { SettingsContext } from '../../../../store/context';
@@ -11,6 +17,7 @@ import {
   UserControls,
   WinnerMsg,
 } from '../../../../components';
+import { checkWinner, getAIMoveValue, delay } from '../../../../utils';
 
 type TProps = {
   setIsStarted: (value: boolean) => void;
@@ -19,105 +26,114 @@ type TProps = {
 const Started: React.FC<TProps> = ({ setIsStarted }) => {
   const { state } = useContext(SettingsContext);
   const [showRules, setShowRules] = useState(false);
-  const [move, setMove] = useState(state.firstMove);
-  const [matches, setMatches] = useState(2 * state.paramN + 1);
-  const [matchesAI, setMatchesAI] = useState(0);
-  const [matchesUser, setMatchesUser] = useState(0);
-  const [disabledBtn, setDisabledBtn] = useState(state.firstMove === 'AI');
-  const [winner, setWinner] = useState('');
+  const [moves, setMoves] = useState<number[]>([]);
 
-  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+  const getMove = useCallback((): 'USER' | 'AI' => {
+    const length = moves.length;
 
-  const handleUserSelect = async (value: number) => {
-    setDisabledBtn(true);
-    setMatches(matches - value);
-    setMatchesUser(matchesUser + value);
+    if (
+      (state.firstMove === 'AI' && length % 2 === 0) ||
+      (state.firstMove === 'USER' && length % 2 !== 0)
+    ) {
+      return 'AI';
+    }
 
-    if (!checkResult(matches - value, matchesUser + value, matchesAI)) {
+    return 'USER';
+  }, [state.firstMove, moves.length]);
+
+  const getUsedMatches = useMemo(() => {
+    return moves.reduce((a, b) => a + b, 0);
+  }, [moves]);
+
+  const getRestMatches = useMemo(() => {
+    return state.paramN * 2 + 1 - moves.reduce((a, b) => a + b, 0);
+  }, [moves, state.paramN]);
+
+  const checkMatches = useMemo(() => {
+    return getUsedMatches >= state.paramN * 2 + 1;
+  }, [getUsedMatches, state.paramN]);
+
+  const getAIMatches = useMemo((): number => {
+    let sum = 0;
+
+    moves.forEach((el, i) => {
+      if (state.firstMove === 'AI' && i % 2 === 0) {
+        sum += el;
+      }
+
+      if (state.firstMove === 'USER' && i % 2 !== 0) {
+        sum += el;
+      }
+    });
+
+    return sum;
+  }, [moves, state.firstMove]);
+
+  const getUserMatches = useMemo((): number => {
+    let sum = 0;
+
+    moves.forEach((el, i) => {
+      if (state.firstMove === 'USER' && i % 2 === 0) {
+        sum += el;
+      }
+
+      if (state.firstMove === 'AI' && i % 2 !== 0) {
+        sum += el;
+      }
+    });
+
+    return sum;
+  }, [moves, state.firstMove]);
+
+  const checkResult = useCallback((): boolean => {
+    const result = checkWinner(getRestMatches, getUserMatches, getAIMatches);
+
+    return result ? true : false;
+  }, [getAIMatches, getRestMatches, getUserMatches]);
+
+  useEffect(() => {
+    const AIMove = async () => {
       await delay(1000);
 
-      setMove('AI');
+      const value = getAIMoveValue(getRestMatches, getAIMatches, state);
+
+      setMoves([...moves, value]);
+    };
+
+    if (getMove() === 'AI' && !checkMatches) {
+      AIMove();
     }
-  };
+  }, [
+    getMove,
+    getAIMatches,
+    getRestMatches,
+    checkResult,
+    checkMatches,
+    moves,
+    state,
+  ]);
 
-  const AIMove = () => {
-    let value = 1;
-
-    if (state.firstMove === 'USER' || matches % (state.paramM + 1) === 1) {
-      for (let i = state.paramM; i > 0; i -= 2) {
-        if (
-          (matches - i) % (state.paramM + 1) === 0 ||
-          (matches - i) % (state.paramM + 1) === 1
-        ) {
-          value = i;
-          break;
-        }
-      }
-    } else {
-      for (let i = state.paramM; i > 0; i -= 2) {
-        if (
-          (matches - i) % (state.paramM + 1) === 1 &&
-          (matchesAI + i) % 2 === 0
-        ) {
-          value = i;
-          break;
-        }
-      }
-    }
-
-    if (matches <= state.paramM) {
-      for (let i = state.paramM; i > 0; i--) {
-        if (
-          (matches - i === 0 || matches - i === 1) &&
-          (matchesAI + i) % 2 === 0
-        ) {
-          value = i;
-          break;
-        }
-      }
-    }
-
-    setMatches(matches - value);
-    setMatchesAI(matchesAI + value);
-    checkResult(matches - value, matchesUser, matchesAI + value);
-    setMove('USER');
-    setDisabledBtn(false);
-  };
-
-  const checkResult = (
-    cMatches: number,
-    cMatchesUser: number,
-    cMatchesAI: number,
-  ): boolean => {
-    if (cMatches === 0) {
-      switch (true) {
-        case cMatchesUser % 2 === 0 && cMatchesAI % 2 === 0:
-          setWinner('DRAW');
-          break;
-        case cMatchesUser % 2 === 0:
-          setWinner('User');
-          break;
-        case cMatchesAI % 2 === 0:
-          setWinner('AI');
-          break;
-      }
-
-      return true;
-    } else {
+  const getDisabledBtn: boolean = useMemo(() => {
+    if (
+      (state.firstMove === 'USER' && moves.length % 2 === 0) ||
+      (state.firstMove === 'AI' && moves.length % 2 !== 0)
+    ) {
       return false;
     }
+
+    return true;
+  }, [moves, state.firstMove]);
+
+  const handleUserSelect = async (value: number) => {
+    setMoves([...moves, value]);
   };
 
-  if (move === 'AI') {
-    AIMove();
-  }
-
-  if (winner) {
+  if (checkResult()) {
     return (
       <WinnerMsg
-        winner={winner}
-        matchesAI={matchesAI}
-        matchesUser={matchesUser}
+        winner={checkWinner(getRestMatches, getUserMatches, getAIMatches)}
+        matchesAI={getAIMatches}
+        matchesUser={getUserMatches}
         handleClick={setIsStarted}
       />
     );
@@ -127,15 +143,15 @@ const Started: React.FC<TProps> = ({ setIsStarted }) => {
     <View style={styles.container}>
       <GameHeading handleBack={setIsStarted} handleShowRules={setShowRules} />
       {showRules && <Rules handleClose={setShowRules} />}
-      <Score type="🤖" value={matchesAI} />
-      <Matches quantity={new Array(matches).fill('1')} />
+      <Score type="🤖" value={getAIMatches} />
+      <Matches quantity={getRestMatches} />
       <UserControls
         handleClick={handleUserSelect}
-        disabled={move === 'AI' || disabledBtn}
-        matches={matches}
+        disabled={getDisabledBtn}
+        matches={getRestMatches}
         paramM={state.paramM}
       />
-      <Score type="🧑" value={matchesUser} />
+      <Score type="🧑" value={getUserMatches} />
     </View>
   );
 };
